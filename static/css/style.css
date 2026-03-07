@@ -1,0 +1,295 @@
+/* Global Resets & Variables */
+:root {
+    --bg-color: #0d1117;
+    --card-bg: rgba(22, 27, 34, 0.7);
+    --border-color: rgba(48, 54, 61, 0.8);
+    --primary: #58a6ff;
+    --primary-hover: #3182ce;
+    --success: #2ea043;
+    --success-hover: #238636;
+    --text-primary: #c9d1d9;
+    --text-secondary: #8b949e;
+    --danger: #f85149;
+    --glass-blur: blur(12px);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Background Design Aesthetics */
+.bg-shape {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(100px);
+    z-index: -1;
+    opacity: 0.4;
+}
+
+.shape-1 {
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(88,166,255,0.4) 0%, rgba(13,17,23,0) 70%);
+    top: -150px;
+    left: -150px;
+}
+
+.shape-2 {
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(46,160,67,0.3) 0%, rgba(13,17,23,0) 70%);
+    bottom: -200px;
+    right: -200px;
+}
+
+/* Main Container */
+.app-container {
+    width: 100%;
+    max-width: 600px;
+    padding: 2rem;
+    position: relative;
+    z-index: 1;
+}
+
+/* Header */
+.header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.logo i {
+    font-size: 2.5rem;
+    color: var(--primary);
+    filter: drop-shadow(0 0 10px rgba(88,166,255,0.5));
+}
+
+.header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+.subtitle {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+
+/* Main Content Views */
+.hidden {
+    display: none !important;
+}
+
+/* Upload Area (Glassmorphism) */
+.upload-area {
+    background: var(--card-bg);
+    backdrop-filter: var(--glass-blur);
+    border: 2px dashed var(--border-color);
+    border-radius: 16px;
+    padding: 4rem 2rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.upload-area:hover, .upload-area.dragover {
+    border-color: var(--primary);
+    background: rgba(31, 111, 235, 0.05);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(88, 166, 255, 0.1);
+}
+
+.upload-icon-wrapper {
+    margin-bottom: 1.5rem;
+}
+
+.upload-icon {
+    font-size: 4rem;
+    color: var(--text-secondary);
+    transition: color 0.3s ease;
+}
+
+.upload-area:hover .upload-icon, .upload-area.dragover .upload-icon {
+    color: var(--primary);
+}
+
+.upload-area h2 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.upload-area p {
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background-color: var(--primary);
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(88, 166, 255, 0.3);
+}
+
+.btn-success {
+    background-color: var(--success);
+    color: #fff;
+}
+
+.btn-success:hover {
+    background-color: var(--success-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(46, 160, 67, 0.3);
+}
+
+.btn-secondary {
+    background-color: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: var(--text-secondary);
+}
+
+/* Status / Processing */
+.upload-status {
+    text-align: center;
+    padding: 3rem;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 3px solid rgba(88, 166, 255, 0.2);
+    border-radius: 50%;
+    border-top-color: var(--primary);
+    animation: spin 1s ease-in-out infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Success Card */
+.success-card {
+    background: var(--card-bg);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 3rem 2rem;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    animation: slideUp 0.4s ease-out;
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.success-icon-wrapper {
+    width: 80px;
+    height: 80px;
+    background-color: rgba(46, 160, 67, 0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+}
+
+.success-icon-wrapper i {
+    font-size: 2.5rem;
+    color: var(--success);
+}
+
+.success-card h2 {
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+}
+
+.success-card p {
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+}
+
+.actions {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* Notifications */
+.notification-area {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 1000;
+}
+
+.notification {
+    background: #252b32;
+    color: #fff;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    border-left: 4px solid var(--danger);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    animation: slideIn 0.3s ease-out;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}

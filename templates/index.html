@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fusion 360 Gcode Optimizer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <i class="fa-solid fa-microchip"></i>
+                <h1>Gcode Optimizer</h1>
+            </div>
+            <p class="subtitle">Restore lost G00 rapid movements to Fusion 360 hobby files.</p>
+        </header>
+
+        <!-- Main Content Phase 1: Upload -->
+        <main class="main-content" id="upload-phase">
+            <div class="upload-area" id="drop-zone">
+                <input type="file" id="file-input" accept=".nc,.tap" multiple hidden>
+
+                <div class="upload-icon-wrapper">
+                    <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                </div>
+
+                <h2>Drag & Drop your .NC or .TAP file here</h2>
+                <p>or</p>
+                <button class="btn btn-primary" id="browse-btn">Browse Files</button>
+            </div>
+
+            <div class="upload-status hidden" id="upload-status">
+                <div class="spinner"></div>
+                <p>Processing and Stitching GCode...</p>
+            </div>
+        </main>
+
+        <!-- Main Content Phase 1.5: File Reordering -->
+        <main class="main-content hidden" id="file-list-phase">
+            <div class="sort-card">
+                <h2>Reorder Files for Tool Changes</h2>
+                <p class="subtitle">Drag the files to ensure they run in the correct sequence.</p>
+
+                <ul class="file-list" id="file-list">
+                    <!-- Javascript will populate list items here -->
+                </ul>
+
+                <div class="actions">
+                    <button class="btn btn-primary" id="stitch-btn">
+                        <i class="fa-solid fa-layer-group"></i> Stitch & Optimize
+                    </button>
+                    <button class="btn btn-secondary" id="cancel-stitch-btn">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Main Content Phase 2: Success/Download -->
+        <main class="main-content hidden" id="success-phase">
+            <div class="success-card">
+                <div class="success-icon-wrapper">
+                    <i class="fa-solid fa-check"></i>
+                </div>
+                <h2>Optimization Complete!</h2>
+                <p>Your false G01 rapids have been restored.</p>
+
+                <div class="actions">
+                    <a href="#" class="btn btn-success" id="download-btn" download>
+                        <i class="fa-solid fa-download"></i> Download Optimized File
+                    </a>
+                    <button class="btn btn-secondary" id="reset-btn">
+                        Optimize Another File
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Error Notification Area -->
+        <div id="notification-area" class="notification-area"></div>
+    </div>
+
+    <!-- Background Decoration -->
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+
+</html>
