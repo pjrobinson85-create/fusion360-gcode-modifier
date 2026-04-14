@@ -11,6 +11,7 @@ class GcodeModifier:
         
     def process_file(self, input_filepath: str, output_filepath: str):
         """Processes an input G-code file and writes the modified output."""
+        self.state = MachineState()  # Reset state so repeated calls on the same instance don't bleed
         with open(input_filepath, 'r') as infile:
             lines = infile.readlines()
             
@@ -52,6 +53,10 @@ class GcodeModifier:
                     ""
                 ])
 
+            # Reset state for each file so position/modal tracking from a previous
+            # file does not bleed into the next one (fixes incorrect rapid detection
+            # when files don't share the same coordinate context).
+            self.state = MachineState()
             processed_lines = self.process_lines(lines)
             
             for line_str in processed_lines:
@@ -133,8 +138,7 @@ class GcodeModifier:
             return parsed
 
         explicit_g = next((t['value'] for t in tokens if t['letter'] == 'G' and t['value'] in [0.0, 1.0, 2.0, 3.0]), None)
-        g_token_idx = next((i for i, t in enumerate(tokens) if t['letter'] == 'G' and t['value'] == explicit_g), -1)
-        
+
         has_xyz_keys = {t['letter'] for t in tokens if t['letter'] in ['X', 'Y', 'Z']}
         
         # Determine the INTENDED motion mode for this line based on the input stream
@@ -174,18 +178,24 @@ class GcodeModifier:
 
         if convert_to_rapid:
             if explicit_g == 1.0:
-                tokens[g_token_idx]['value'] = 0.0
+                # Mutate the existing G1 token to G0 in-place rather than using a
+                # fragile index lookup (avoids the -1 sentinel corrupting the last token).
+                for t in tokens:
+                    if t['letter'] == 'G' and t['value'] == 1.0:
+                        t['value'] = 0.0
+                        break
             else:
-                # Inject G0 at the start of the token list
+                # Modal G1 — inject a G0 at the start of the token list
                 tokens.insert(0, {'letter': 'G', 'value': 0.0})
-                
+
             # Remove F token from the optimized rapid line
             parsed['tokens'] = [t for t in tokens if t['letter'] != 'F']
             # Note: We don't update self.state.motion_mode here, _update_state will handle it.
         else:
             # SAFETY RECOVERY: If we are NOT converting to rapid, but our OUTPUT state is currently G0,
             # we MUST restore the intended mode (usually G1, G2, or G3) to prevent a modal rapid crash.
-            if self.state.motion_mode == 0.0 and explicit_g is None:
+            # Guard intended_g: it can be None if no motion command has appeared yet in this file.
+            if self.state.motion_mode == 0.0 and explicit_g is None and intended_g is not None:
                 tokens.insert(0, {'letter': 'G', 'value': intended_g})
 
         return parsed
