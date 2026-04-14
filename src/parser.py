@@ -2,7 +2,7 @@ import re
 from typing import Dict, Any
 
 class GcodeParser:
-    """Parses a raw string of gcode into a tokenized dictionary of commands and values."""
+    """Parses a raw string of gcode into a token list of commands and values."""
     
     # Matches comments like (T3 ...) or standalone semicolon comments
     COMMENT_PATTERN = re.compile(r'\(.*?\)|;.*')
@@ -17,13 +17,13 @@ class GcodeParser:
         Returns a dictionary with:
         - 'raw': The original line string
         - 'comment': The extracted comment (if any)
-        - 'tokens': A dictionary of parsed letter-value pairs (e.g., {'G': 1.0, 'X': 50.0})
+        - 'tokens': A list of parse dicts (e.g., [{'letter': 'G', 'value': 1.0}])
         - 'is_empty': True if the line has no actionable commands
         """
         result = {
             'raw': line,
             'comment': '',
-            'tokens': {},
+            'tokens': [],
             'is_empty': True
         }
         
@@ -43,7 +43,7 @@ class GcodeParser:
             for match in GcodeParser.TOKEN_PATTERN.finditer(line_no_comment.upper()):
                 letter = match.group(1)
                 value = float(match.group(2))
-                result['tokens'][letter] = value
+                result['tokens'].append({'letter': letter, 'value': value})
                 
         return result
 
@@ -54,16 +54,16 @@ class GcodeParser:
             return parsed_data['comment']
             
         parts = []
-        # Ensure G or M codes come first for readability
-        for key in ['G', 'M', 'T', 'S', 'X', 'Y', 'Z', 'I', 'J', 'K', 'F']:
-            if key in parsed_data['tokens']:
-                val = parsed_data['tokens'][key]
-                # Format to remove trailing zeros if it's an integer
-                val_str = f"{val:g}"
-                # G-code standard often requires decimal points even on integers
-                if '.' not in val_str and key in ['X', 'Y', 'Z', 'I', 'J', 'K', 'F']:
-                    val_str += '.'
-                parts.append(f"{key}{val_str}")
+        # Maintain exact original ordering of tokens
+        for token in parsed_data['tokens']:
+            key = token['letter']
+            val = token['value']
+            # Format to remove trailing zeros if it's an integer
+            val_str = f"{val:g}"
+            # G-code standard often requires decimal points even on integers
+            if '.' not in val_str and key in ['X', 'Y', 'Z', 'I', 'J', 'K', 'F']:
+                val_str += '.'
+            parts.append(f"{key}{val_str}")
                 
         line_str = " ".join(parts)
         if parsed_data['comment']:

@@ -4,6 +4,8 @@ class MachineState:
     def __init__(self):
         self.position = {'X': None, 'Y': None, 'Z': None}
         self.mode = 'G90'  # Default to Absolute coordinate mode
+        self.motion_mode = None  # Tracks modal G0, G1, G2, G3 in the OUTPUT 
+        self.input_motion_mode = None  # Tracks modal G in the INPUT
         self.feedrate = None
         self.spindle_state = 'M05' # Off by default
         self.active_tool = None
@@ -23,6 +25,8 @@ class MachineState:
         new_state = MachineState()
         new_state.position = dict(self.position)
         new_state.mode = self.mode
+        new_state.motion_mode = self.motion_mode
+        new_state.input_motion_mode = self.input_motion_mode
         new_state.feedrate = self.feedrate
         new_state.spindle_state = self.spindle_state
         new_state.active_tool = self.active_tool

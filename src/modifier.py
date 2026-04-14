@@ -25,8 +25,14 @@ class GcodeModifier:
         all_output_lines = []
         
         def is_end_command(parsed_line):
-            t = parsed_line['tokens']
-            return t.get('M') in [2.0, 30.0]
+            for t in parsed_line['tokens']:
+                # Strip End of Program
+                if t['letter'] == 'M' and t['value'] in [2.0, 30.0]:
+                    return True
+                # Strip Machine Homing (G28) from intermediate transitions
+                if t['letter'] == 'G' and t['value'] == 28.0:
+                    return True
+            return False
 
         for i, filepath in enumerate(input_filepaths):
             with open(filepath, 'r') as infile:
@@ -41,6 +47,7 @@ class GcodeModifier:
                     "",
                     "; --- AUTO-INJECTED TOOL CHANGE SAFETY BLOCK ---",
                     "M05 ; Force spindle OFF prior to Fusion's M06 macro",
+                    f"G0 Z{self.config.safe_z_height} ; Lift to Safe Z before move",
                     "; ----------------------------------------------",
                     ""
                 ])
@@ -64,61 +71,121 @@ class GcodeModifier:
             parsed = GcodeParser.parse_line(raw_line)
             
             if not parsed['is_empty']:
-                self._update_state(parsed)
+                # Update input modal state before we optimize
+                self._update_input_state(parsed)
+                
                 parsed = self._optimize_rapids(parsed)
+                self._update_state(parsed)
                 
             output_lines.append(GcodeParser.rebuild_line(parsed))
             
         return output_lines
+
+    def _update_input_state(self, parsed: dict):
+        """Tracks the modal state of the original input file."""
+        tokens = parsed['tokens']
+        # Ignore machine homing and relative moves for position tracking
+        has_g28 = any(t['letter'] == 'G' and t['value'] == 28.0 for t in tokens)
+        if has_g28: return
+
+        for t in tokens:
+            if t['letter'] == 'G' and t['value'] in [0.0, 1.0, 2.0, 3.0]:
+                self.state.input_motion_mode = t['value']
         
     def _update_state(self, parsed: dict):
-        """Updates the virtual machine state based on the current line."""
+        """Updates the virtual machine state based on the current line (output state)."""
         tokens = parsed['tokens']
         
-        # Track position
-        x = tokens.get('X')
-        y = tokens.get('Y')
-        z = tokens.get('Z')
+        # Ignore machine homing for position tracking
+        has_g28 = any(t['letter'] == 'G' and t['value'] == 28.0 for t in tokens)
+        if has_g28: return
+
+        # Track Mode (Absolute vs Relative)
+        for t in tokens:
+            if t['letter'] == 'G':
+                if t['value'] == 90.0: self.state.mode = 'G90'
+                elif t['value'] == 91.0: self.state.mode = 'G91'
+
+        # We only track positions in Absolute mode
+        if self.state.mode != 'G90':
+            return
+
+        x, y, z = None, None, None
+        for t in tokens:
+            letter = t['letter']
+            val = t['value']
+            if letter == 'X': x = val
+            elif letter == 'Y': y = val
+            elif letter == 'Z': z = val
+            elif letter == 'F': self.state.feedrate = val
+            elif letter == 'G' and val in [0.0, 1.0, 2.0, 3.0]:
+                self.state.motion_mode = val
+                
         if any(val is not None for val in [x, y, z]):
             self.state.update_position(x, y, z)
-            
-        # Track feedrate
-        if 'F' in tokens:
-            self.state.feedrate = tokens['F']
 
     def _optimize_rapids(self, parsed: dict) -> dict:
-        """Examines a G01 move and converts it to G00 if it meets safety criteria."""
+        """Examines a motion move and converts it to G00 if safe, OR restores G01 if returning from a rapid."""
         tokens = parsed['tokens']
         
-        # We only care about converting G01 moves
-        if tokens.get('G') != 1.0:
+        # Block optimization and restoration on homing moves
+        if any(t['letter'] == 'G' and t['value'] == 28.0 for t in tokens):
             return parsed
-            
+
+        explicit_g = next((t['value'] for t in tokens if t['letter'] == 'G' and t['value'] in [0.0, 1.0, 2.0, 3.0]), None)
+        g_token_idx = next((i for i, t in enumerate(tokens) if t['letter'] == 'G' and t['value'] == explicit_g), -1)
+        
+        has_xyz_keys = {t['letter'] for t in tokens if t['letter'] in ['X', 'Y', 'Z']}
+        
+        # Determine the INTENDED motion mode for this line based on the input stream
+        intended_g = explicit_g if explicit_g is not None else self.state.input_motion_mode
+        
+        # We only consider optimizing G1 moves. G0, G2, G3 are passed as-is.
+        # However, we MUST handle the case where we previously injected a G0 and now need to restore the intended mode.
+        if intended_g is None or len(has_xyz_keys) == 0:
+            return parsed
+
         # If we don't know where the machine is, it's not safe to optimize
         if not self.state.is_valid_position():
             return parsed
 
-        feedrate = tokens.get('F', self.state.feedrate)
+        feed_token = next((t['value'] for t in tokens if t['letter'] == 'F'), None)
+        feedrate = feed_token if feed_token is not None else self.state.feedrate
+        
         if feedrate is None:
             return parsed
 
-        # Rule 1: High-feedrate X/Y horizontal moves at or above the Safe Z clearance plane
-        if 'X' in tokens or 'Y' in tokens:
-            if self.state.position['Z'] >= self.config.safe_z_height:
-                if feedrate >= self.config.xy_rapid_threshold:
-                    tokens['G'] = 0.0 # Convert to Rapid
-                    if 'F' in tokens:
-                        del tokens['F'] # Rapids don't need feedrates
-                    return parsed
-                    
-        # Rule 2: High-feedrate purely vertical Z retracts
-        if 'Z' in tokens and 'X' not in tokens and 'Y' not in tokens:
-            # We only convert retracts (Z moving UP)
-            if tokens['Z'] > self.state.position['Z']:
-                if feedrate >= self.config.z_rapid_threshold:
-                    tokens['G'] = 0.0
-                    if 'F' in tokens:
-                        del tokens['F']
-                    return parsed
+        convert_to_rapid = False
+
+        if intended_g == 1.0:
+            # Rule 1: High-feedrate X/Y horizontal moves at or above the Safe Z clearance plane
+            if 'X' in has_xyz_keys or 'Y' in has_xyz_keys:
+                target_z = next((t['value'] for t in tokens if t['letter'] == 'Z'), self.state.position['Z'])
+                if self.state.position['Z'] >= self.config.safe_z_height and target_z >= self.config.safe_z_height:
+                    if feedrate >= self.config.xy_rapid_threshold:
+                        convert_to_rapid = True
+                        
+            # Rule 2: High-feedrate purely vertical Z retracts
+            if 'Z' in has_xyz_keys and 'X' not in has_xyz_keys and 'Y' not in has_xyz_keys:
+                z_target = next((t['value'] for t in tokens if t['letter'] == 'Z'), None)
+                if z_target is not None and z_target > self.state.position['Z']:
+                    if feedrate >= self.config.z_rapid_threshold:
+                        convert_to_rapid = True
+
+        if convert_to_rapid:
+            if explicit_g == 1.0:
+                tokens[g_token_idx]['value'] = 0.0
+            else:
+                # Inject G0 at the start of the token list
+                tokens.insert(0, {'letter': 'G', 'value': 0.0})
+                
+            # Remove F token from the optimized rapid line
+            parsed['tokens'] = [t for t in tokens if t['letter'] != 'F']
+            # Note: We don't update self.state.motion_mode here, _update_state will handle it.
+        else:
+            # SAFETY RECOVERY: If we are NOT converting to rapid, but our OUTPUT state is currently G0,
+            # we MUST restore the intended mode (usually G1, G2, or G3) to prevent a modal rapid crash.
+            if self.state.motion_mode == 0.0 and explicit_g is None:
+                tokens.insert(0, {'letter': 'G', 'value': intended_g})
 
         return parsed

@@ -89,7 +89,7 @@ def stitch_files():
         if not filepaths:
             return jsonify({'error': 'Invalid file types. Please upload .nc or .tap files.'}), 400
             
-        output_filename = "Master_Job_Optimized.nc"
+        output_filename = "Master_Job_Optimized.tap"
         output_path = os.path.join(app.config['OUTPUT_FOLDER'], output_filename)
         
         config = ConfigManager()
