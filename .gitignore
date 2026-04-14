@@ -9,6 +9,7 @@ ENV/
 uploads/
 outputs/
 *.txt
+!requirements.txt
 .gemini/
 .agent/
 .system_generated/

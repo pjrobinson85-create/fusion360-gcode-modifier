@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let validFiles = [];
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
-            if (file.name.endsWith('.nc') || file.name.endsWith('.tap')) {
+            if (file.name.toLowerCase().endsWith('.nc') || file.name.toLowerCase().endsWith('.tap')) {
                 validFiles.push(file);
             } else {
                 showNotification(`Skipped ${file.name}: Invalid file type.`, 'error');

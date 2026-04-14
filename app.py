@@ -1,4 +1,5 @@
 import os
+import uuid
 from flask import Flask, request, render_template, send_file, jsonify
 from werkzeug.utils import secure_filename
 import traceback
@@ -35,14 +36,15 @@ def upload_file():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
         
-    if file and (file.filename.endswith('.nc') or file.filename.endswith('.tap')):
+    if file and (file.filename.lower().endswith('.nc') or file.filename.lower().endswith('.tap')):
         try:
-            filename = secure_filename(file.filename)
+            uid = uuid.uuid4().hex
+            safe_name = secure_filename(file.filename)
+            filename = f"{uid}_{safe_name}"
             input_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            
-            # Generate the output filename
-            name, ext = os.path.splitext(filename)
-            output_filename = f"{name}_optimized{ext}"
+
+            base, ext = os.path.splitext(safe_name)
+            output_filename = f"{uid}_{base}_optimized{ext}"
             output_path = os.path.join(app.config['OUTPUT_FOLDER'], output_filename)
             
             # Save the original file
@@ -78,18 +80,19 @@ def stitch_files():
         return jsonify({'error': 'No selected files'}), 400
         
     try:
+        uid = uuid.uuid4().hex
         filepaths = []
         for f in files:
-            if f and (f.filename.endswith('.nc') or f.filename.endswith('.tap')):
-                filename = secure_filename(f.filename)
+            if f and (f.filename.lower().endswith('.nc') or f.filename.lower().endswith('.tap')):
+                filename = f"{uid}_{secure_filename(f.filename)}"
                 path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 f.save(path)
                 filepaths.append(path)
-                
+
         if not filepaths:
             return jsonify({'error': 'Invalid file types. Please upload .nc or .tap files.'}), 400
-            
-        output_filename = "Master_Job_Optimized.tap"
+
+        output_filename = f"{uid}_Master_Job_Optimized.tap"
         output_path = os.path.join(app.config['OUTPUT_FOLDER'], output_filename)
         
         config = ConfigManager()
@@ -120,4 +123,7 @@ if __name__ == '__main__':
     # Initialize the engine once to ensure config is available
     config = ConfigManager()
     print(f"Server starting. Safe Z-Height is set to: {config.safe_z_height}mm")
-    app.run(debug=True, host='0.0.0.0', port=5005)
+    debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
+    host = os.environ.get('FLASK_HOST', '127.0.0.1')
+    port = int(os.environ.get('FLASK_PORT', '5005'))
+    app.run(debug=debug, host=host, port=port)
