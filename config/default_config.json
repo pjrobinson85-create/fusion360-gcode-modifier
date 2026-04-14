@@ -9,7 +9,7 @@
             "rpm": 18000
         }
     ],
-    "safe_z_height": 1.0,
+    "safe_z_height": 15.0,
     "rapid_feedrate_thresholds": {
         "X_Y_RAPID": 500,
         "Z_RAPID": 500
