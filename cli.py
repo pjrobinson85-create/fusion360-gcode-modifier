@@ -15,6 +15,9 @@ def main():
         print(f"Error: Could not find input file: {args.input}")
         sys.exit(1)
         
+    output_dir = os.path.dirname(os.path.abspath(args.output))
+    os.makedirs(output_dir, exist_ok=True)
+
     print(f"Loading configuration...")
     config = ConfigManager()
     

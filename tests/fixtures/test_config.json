@@ -1,0 +1,9 @@
+{
+    "safe_z_height": 5.0,
+    "rapid_feedrate_thresholds": {
+        "X_Y_RAPID": 500,
+        "Z_RAPID": 500
+    },
+    "tool_change_position": {"X": 0.0, "Y": 0.0, "Z": 50.0},
+    "tools": [{"id": 1, "name": "Test Mill", "diameter": 6.0}]
+}
