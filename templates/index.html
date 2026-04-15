@@ -71,7 +71,31 @@
                     <i class="fa-solid fa-check"></i>
                 </div>
                 <h2>Optimization Complete!</h2>
-                <p>Your false G01 rapids have been restored.</p>
+                <p id="success-subtitle">Your G-code has been optimized.</p>
+
+                <!-- Processing statistics -->
+                <div class="stats-grid">
+                    <div class="stat-tile">
+                        <i class="fa-solid fa-bolt stat-icon stat-primary"></i>
+                        <span class="stat-value" id="stat-rapids">—</span>
+                        <span class="stat-label">rapids restored</span>
+                    </div>
+                    <div class="stat-tile" id="stat-files-tile">
+                        <i class="fa-solid fa-layer-group stat-icon stat-purple"></i>
+                        <span class="stat-value" id="stat-files">—</span>
+                        <span class="stat-label">files merged</span>
+                    </div>
+                    <div class="stat-tile" id="stat-changes-tile">
+                        <i class="fa-solid fa-wrench stat-icon stat-warning"></i>
+                        <span class="stat-value" id="stat-changes">—</span>
+                        <span class="stat-label">tool changes</span>
+                    </div>
+                    <div class="stat-tile" id="stat-skipped-tile">
+                        <i class="fa-solid fa-forward-step stat-icon stat-success"></i>
+                        <span class="stat-value" id="stat-skipped">—</span>
+                        <span class="stat-label">changes skipped</span>
+                    </div>
+                </div>
 
                 <div class="actions">
                     <a href="#" class="btn btn-success" id="download-btn" download>

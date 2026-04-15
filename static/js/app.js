@@ -178,6 +178,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Set download link
                 downloadBtn.href = data.download_url;
                 downloadBtn.download = data.filename;
+
+                // Populate processing statistics
+                if (data.report) populateStats(data.report);
             })
             .catch(error => {
                 // UI State: Reset to upload
@@ -187,6 +190,39 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     }
 
+    // --- Processing Statistics --- //
+    function populateStats(report) {
+        const filesTile   = document.getElementById('stat-files-tile');
+        const changesTile = document.getElementById('stat-changes-tile');
+        const skippedTile = document.getElementById('stat-skipped-tile');
+        const subtitle    = document.getElementById('success-subtitle');
+
+        document.getElementById('stat-rapids').textContent =
+            report.rapids_converted.toLocaleString();
+
+        const isStitch = report.files_stitched > 1;
+
+        if (isStitch) {
+            document.getElementById('stat-files').textContent   = report.files_stitched;
+            document.getElementById('stat-changes').textContent = report.tool_changes_injected;
+            document.getElementById('stat-skipped').textContent = report.tool_changes_skipped;
+
+            filesTile.classList.remove('hidden');
+            changesTile.classList.remove('hidden');
+            // Only show "skipped" tile if at least one same-tool transition occurred
+            skippedTile.classList.toggle('hidden', report.tool_changes_skipped === 0);
+
+            const changeWord = report.tool_changes_injected === 1 ? 'change' : 'changes';
+            subtitle.textContent =
+                `${report.files_stitched} files merged with ${report.tool_changes_injected} tool ${changeWord}.`;
+        } else {
+            filesTile.classList.add('hidden');
+            changesTile.classList.add('hidden');
+            skippedTile.classList.add('hidden');
+            subtitle.textContent = `${report.rapids_converted.toLocaleString()} G1 travel moves restored to G0 rapids.`;
+        }
+    }
+
     // --- Reset Flow --- //
     resetBtn.addEventListener('click', () => {
         successPhase.classList.add('hidden');
@@ -194,6 +230,14 @@ document.addEventListener('DOMContentLoaded', () => {
         dropZone.classList.remove('hidden');
         uploadStatus.classList.add('hidden');
         fileInput.value = ''; // clear input
+
+        // Reset stats tiles to placeholder state
+        ['stat-rapids', 'stat-files', 'stat-changes', 'stat-skipped'].forEach(id => {
+            document.getElementById(id).textContent = '—';
+        });
+        document.getElementById('stat-files-tile').classList.remove('hidden');
+        document.getElementById('stat-changes-tile').classList.remove('hidden');
+        document.getElementById('stat-skipped-tile').classList.remove('hidden');
     });
 
     // --- Notifications --- //

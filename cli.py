@@ -25,9 +25,12 @@ def main():
     modifier = GcodeModifier(config)
     
     print(f"Processing {args.input}...")
-    modifier.process_file(args.input, args.output)
-    
-    print(f"Success! Optimized Gcode saved to {args.output}")
+    report = modifier.process_file(args.input, args.output)
+
+    print(f"\nSuccess! Optimized G-code saved to: {args.output}")
+    print("\nProcessing summary:")
+    for line in report.summary_lines():
+        print(line)
 
 if __name__ == "__main__":
     main()

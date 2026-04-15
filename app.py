@@ -53,14 +53,15 @@ def upload_file():
             # Process the file via the engine
             config = ConfigManager()
             modifier = GcodeModifier(config)
-            modifier.process_file(input_path, output_path)
-            
-            # Return success and the download URL
+            report = modifier.process_file(input_path, output_path)
+
+            # Return success, download URL, and processing stats
             return jsonify({
                 'success': True,
                 'message': 'File processed successfully!',
                 'download_url': f'/api/download/{output_filename}',
-                'filename': output_filename
+                'filename': output_filename,
+                'report': report.to_dict(),
             })
             
         except Exception as e:
@@ -97,13 +98,14 @@ def stitch_files():
         
         config = ConfigManager()
         modifier = GcodeModifier(config)
-        modifier.stitch_files(filepaths, output_path)
-        
+        report = modifier.stitch_files(filepaths, output_path)
+
         return jsonify({
             'success': True,
             'message': 'Files stitched and optimized!',
             'download_url': f'/api/download/{output_filename}',
-            'filename': output_filename
+            'filename': output_filename,
+            'report': report.to_dict(),
         })
     except Exception as e:
         traceback.print_exc()

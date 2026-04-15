@@ -1,6 +1,44 @@
+from dataclasses import dataclass, field
 from src.parser import GcodeParser
 from src.state import MachineState
 from src.config import ConfigManager
+
+
+@dataclass
+class ProcessingReport:
+    """Collects statistics produced by a single process_file or stitch_files run."""
+    rapids_converted: int = 0
+    lines_processed: int = 0
+    files_stitched: int = 0
+    tool_changes_injected: int = 0   # different-tool transitions — safety block inserted
+    tool_changes_skipped: int = 0    # same-tool continuations — M6 stripped, no stop
+
+    def to_dict(self) -> dict:
+        return {
+            'rapids_converted':      self.rapids_converted,
+            'lines_processed':       self.lines_processed,
+            'files_stitched':        self.files_stitched,
+            'tool_changes_injected': self.tool_changes_injected,
+            'tool_changes_skipped':  self.tool_changes_skipped,
+        }
+
+    def summary_lines(self) -> list[str]:
+        """Return human-readable lines suitable for CLI output."""
+        lines = [
+            f"  Rapids restored:        {self.rapids_converted:,}",
+            f"  Lines processed:        {self.lines_processed:,}",
+        ]
+        if self.files_stitched > 1:
+            lines += [
+                f"  Files merged:           {self.files_stitched}",
+                f"  Tool changes injected:  {self.tool_changes_injected}",
+            ]
+            if self.tool_changes_skipped:
+                lines.append(
+                    f"  Same-tool continuations:{self.tool_changes_skipped}  (no stop required)"
+                )
+        return lines
+
 
 class GcodeModifier:
     """Core engine that modifies G-code to restore missing rapids and inject tool changes."""
@@ -8,10 +46,15 @@ class GcodeModifier:
     def __init__(self, config_manager: ConfigManager):
         self.config = config_manager
         self.state = MachineState()
+        self._report = ProcessingReport()
 
-    def process_file(self, input_filepath: str, output_filepath: str):
-        """Processes an input G-code file and writes the modified output."""
+    def process_file(self, input_filepath: str, output_filepath: str) -> ProcessingReport:
+        """Processes an input G-code file and writes the modified output.
+
+        Returns a ProcessingReport with conversion statistics.
+        """
         self.state = MachineState()  # Reset state so repeated calls on the same instance don't bleed
+        self._report = ProcessingReport()
         with open(input_filepath, 'r') as infile:
             lines = infile.readlines()
 
@@ -21,7 +64,10 @@ class GcodeModifier:
             for line in modified_lines:
                 outfile.write(line + '\n')
 
-    def stitch_files(self, input_filepaths: list[str], output_filepath: str):
+        self._report.files_stitched = 1
+        return self._report
+
+    def stitch_files(self, input_filepaths: list[str], output_filepath: str) -> ProcessingReport:
         """Processes and merges multiple G-code files.
 
         For transitions where the tool changes, a safety block is injected and
@@ -29,6 +75,7 @@ class GcodeModifier:
         same, the safety block is skipped and the redundant M6 is stripped so
         the machine continues cutting without interruption.
         """
+        self._report = ProcessingReport()
         all_output_lines = []
 
         def is_end_command(parsed_line):
@@ -76,6 +123,7 @@ class GcodeModifier:
             if not is_first_file:
                 if same_tool:
                     # No tool change — just a separator comment, machine keeps going
+                    self._report.tool_changes_skipped += 1
                     all_output_lines.extend([
                         "",
                         f"; --- CONTINUING WITH TOOL T{curr_tool} (no tool change required) ---",
@@ -83,6 +131,7 @@ class GcodeModifier:
                     ])
                 else:
                     # Different tool — inject the safety block so M6Start.m1s runs cleanly
+                    self._report.tool_changes_injected += 1
                     all_output_lines.extend([
                         "",
                         "; --- AUTO-INJECTED TOOL CHANGE SAFETY BLOCK ---",
@@ -115,6 +164,9 @@ class GcodeModifier:
             for line in all_output_lines:
                 outfile.write(line + '\n')
 
+        self._report.files_stitched = len(file_data)
+        return self._report
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -132,6 +184,7 @@ class GcodeModifier:
         return None
 
     def process_lines(self, lines: list[str]) -> list[str]:
+        self._report.lines_processed += len(lines)
         output_lines = []
         for raw_line in lines:
             parsed = GcodeParser.parse_line(raw_line)
@@ -233,6 +286,7 @@ class GcodeModifier:
                         convert_to_rapid = True
 
         if convert_to_rapid:
+            self._report.rapids_converted += 1
             if explicit_g == 1.0:
                 for t in tokens:
                     if t['letter'] == 'G' and t['value'] == 1.0:
