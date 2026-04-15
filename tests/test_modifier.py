@@ -24,10 +24,11 @@ from src.state import MachineState
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), 'fixtures')
 
 
-def make_config(safe_z=5.0, xy_threshold=500, z_threshold=500):
+def make_config(safe_z=5.0, clearance=0.5, xy_threshold=500, z_threshold=500):
     """Create a temporary ConfigManager with controlled test values."""
     cfg = {
         "safe_z_height": safe_z,
+        "clearance_height": clearance,
         "rapid_feedrate_thresholds": {
             "X_Y_RAPID": xy_threshold,
             "Z_RAPID": z_threshold,
@@ -41,9 +42,9 @@ def make_config(safe_z=5.0, xy_threshold=500, z_threshold=500):
     return ConfigManager(f.name), f.name
 
 
-def process(lines, safe_z=5.0, xy_threshold=500, z_threshold=500):
+def process(lines, safe_z=5.0, clearance=0.5, xy_threshold=500, z_threshold=500):
     """Helper: run process_lines on a list of strings, return output lines."""
-    config, tmp = make_config(safe_z, xy_threshold, z_threshold)
+    config, tmp = make_config(safe_z, clearance, xy_threshold, z_threshold)
     try:
         modifier = GcodeModifier(config)
         return modifier.process_lines(lines)
@@ -82,22 +83,40 @@ class TestOptimiseXYRapids:
         t = tokens_of(result[-1])
         assert t.get('G') == 1.0
 
-    def test_high_feedrate_below_safe_z_stays_g1(self):
+    def test_travel_at_clearance_plane_converts_to_g0(self):
+        """A move at the clearance plane (above workpiece, below safe_z) must
+        still become a rapid — clearance_height (0.5mm) governs rapid detection,
+        NOT safe_z_height (5mm) which is only for tool-change retracts."""
         lines = [
             "G90",
-            "G0 X0. Y0. Z2.",  # Z=2 < safe_z=5
+            "G0 X0. Y0. Z1.",   # Z=1 > clearance=0.5 but < safe_z=5
             "G1 X100. Y0. F600.",
+        ]
+        result = process(lines)   # clearance defaults to 0.5
+        t = tokens_of(result[-1])
+        assert t.get('G') == 0.0, \
+            "Travel move at clearance plane should be converted to G0"
+
+    def test_cutting_move_below_clearance_stays_g1(self):
+        """A cutting move where the tool descends below clearance_height (into
+        material) must never be converted to a rapid regardless of feedrate."""
+        lines = [
+            "G90",
+            "G0 X0. Y0. Z1.",    # at clearance plane
+            "G1 X50. Y0. Z-1. F600.",  # target Z=-1, below clearance=0.5
         ]
         result = process(lines)
         t = tokens_of(result[-1])
-        assert t.get('G') == 1.0
+        assert t.get('G') == 1.0, \
+            "Move descending below clearance plane must stay G1"
 
     def test_move_descending_into_cut_stays_g1(self):
-        """X/Y move that takes Z below safe height should never become a rapid."""
+        """X/Y move whose target Z descends below clearance_height (into material)
+        must never become a rapid, even at a high feedrate."""
         lines = [
             "G90",
-            "G0 X0. Y0. Z10.",
-            "G1 X50. Y0. Z2. F600.",  # target Z=2 < safe_z=5
+            "G0 X0. Y0. Z1.",          # at clearance plane
+            "G1 X50. Y0. Z-0.5 F600.", # descending into material — target below clearance=0.5
         ]
         result = process(lines)
         t = tokens_of(result[-1])

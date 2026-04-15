@@ -1,5 +1,6 @@
 {
     "safe_z_height": 5.0,
+    "clearance_height": 0.5,
     "rapid_feedrate_thresholds": {
         "X_Y_RAPID": 500,
         "Z_RAPID": 500

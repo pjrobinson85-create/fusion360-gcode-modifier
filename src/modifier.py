@@ -216,7 +216,13 @@ class GcodeModifier:
         if intended_g == 1.0:
             if 'X' in has_xyz_keys or 'Y' in has_xyz_keys:
                 target_z = next((t['value'] for t in tokens if t['letter'] == 'Z'), self.state.position['Z'])
-                if self.state.position['Z'] >= self.config.safe_z_height and target_z >= self.config.safe_z_height:
+                # Both current and target Z must be at or above the clearance plane —
+                # this confirms the tool is in the air and not descending into the work.
+                # clearance_height is typically 0.5–2 mm (matches the CAM retract plane).
+                # safe_z_height (15 mm) is intentionally NOT used here; it is only for
+                # tool-change retracts and would incorrectly block legitimate travel moves
+                # at the lower clearance plane (e.g. Z=1 mm).
+                if self.state.position['Z'] >= self.config.clearance_height and target_z >= self.config.clearance_height:
                     if feedrate >= self.config.xy_rapid_threshold:
                         convert_to_rapid = True
 

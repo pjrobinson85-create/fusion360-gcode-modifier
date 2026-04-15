@@ -22,8 +22,19 @@ class ConfigManager:
             
     @property
     def safe_z_height(self) -> float:
-        """The absolute Z height the machine must retract to before X/Y rapids."""
+        """The absolute Z height the machine must retract to before tool changes."""
         return float(self._config.get("safe_z_height", 20.0))
+
+    @property
+    def clearance_height(self) -> float:
+        """Minimum Z (work coords) at which the tool is considered clear of the
+        workpiece.  Any XY or Z-retract move where both current and target Z are
+        at or above this height is eligible to be converted to a G0 rapid.
+        Should match the clearance/retract plane set in the CAM post-processor
+        (typically 0.5–3 mm above the stock top).  Kept intentionally low so it
+        never blocks legitimate travel moves; safe_z_height handles the higher
+        retract needed for tool changes."""
+        return float(self._config.get("clearance_height", 0.5))
         
     @property
     def xy_rapid_threshold(self) -> float:
