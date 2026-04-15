@@ -428,3 +428,76 @@ class TestStitchFiles:
         finally:
             for p in [tap, out.name, tmp]:
                 os.unlink(p)
+
+    def test_same_tool_skips_safety_block(self):
+        """
+        When both files use the same tool number (T2 M6), no safety block
+        should be injected and the machine should continue without stopping.
+        """
+        file_a = self._write_tap(["T2 M6", "G90", "G0 X0. Y0. Z10.", "G1 X50. F600.", "M30"])
+        file_b = self._write_tap(["T2 M6", "G90", "G0 X0. Y0. Z10.", "G1 X80. F600.", "M30"])
+        out = tempfile.NamedTemporaryFile(suffix='.tap', delete=False)
+        out.close()
+        config, tmp = make_config()
+        try:
+            modifier = GcodeModifier(config)
+            modifier.stitch_files([file_a, file_b], out.name)
+            content = open(out.name).read()
+            assert 'TOOL CHANGE SAFETY BLOCK' not in content, \
+                "Same-tool transition must not inject a safety block"
+            assert 'no tool change required' in content.lower(), \
+                "Expected continuation comment for same-tool transition"
+        finally:
+            for p in [file_a, file_b, out.name, tmp]:
+                os.unlink(p)
+
+    def test_same_tool_strips_m6(self):
+        """
+        For a same-tool continuation the redundant M6 in the second file must
+        be stripped so M6Start.m1s is never triggered unnecessarily.
+        """
+        file_a = self._write_tap(["T2 M6", "G90", "G0 X0. Y0. Z10.", "M30"])
+        file_b = self._write_tap(["T2 M6", "G90", "G0 X0. Y0. Z10.", "M30"])
+        out = tempfile.NamedTemporaryFile(suffix='.tap', delete=False)
+        out.close()
+        config, tmp = make_config()
+        try:
+            modifier = GcodeModifier(config)
+            modifier.stitch_files([file_a, file_b], out.name)
+            content = open(out.name).read()
+            # File A's M6 must be present; file B's must be stripped.
+            # Count only actual M6 tokens (not comment text containing 'M6').
+            m6_count = sum(
+                1 for line in content.splitlines()
+                if not line.strip().startswith(';')
+                and any(
+                    t['letter'] == 'M' and t['value'] == 6.0
+                    for t in GcodeParser.parse_line(line)['tokens']
+                )
+            )
+            assert m6_count == 1, \
+                f"Expected exactly 1 M6 in stitched output, found {m6_count}"
+        finally:
+            for p in [file_a, file_b, out.name, tmp]:
+                os.unlink(p)
+
+    def test_different_tool_injects_safety_block(self):
+        """
+        When files use different tool numbers the safety block must still be
+        injected — regression guard for the same-tool detection logic.
+        """
+        file_a = self._write_tap(["T1 M6", "G90", "G0 X0. Y0. Z10.", "M30"])
+        file_b = self._write_tap(["T2 M6", "G90", "G0 X0. Y0. Z10.", "M30"])
+        out = tempfile.NamedTemporaryFile(suffix='.tap', delete=False)
+        out.close()
+        config, tmp = make_config()
+        try:
+            modifier = GcodeModifier(config)
+            modifier.stitch_files([file_a, file_b], out.name)
+            content = open(out.name).read()
+            assert 'TOOL CHANGE SAFETY BLOCK' in content, \
+                "Different-tool transition must inject safety block"
+            assert 'M05' in content
+        finally:
+            for p in [file_a, file_b, out.name, tmp]:
+                os.unlink(p)
